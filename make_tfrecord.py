@@ -24,25 +24,24 @@ if __name__ == "__main__":
     ######### DIRECTRY SETUP #########
 
     DATA_DIR = sys.argv[1]
-    TF_RECORD_FILENAME = os.path.join(DATA_DIR, "dataset.tfrecords")
+    TF_RECORD_FILENAME = os.path.join('.', "dataset.tfrecords")
     PATCH_DIMS = (64, 64)
 
     ######### GET DATA FILENAMES #########
-    pos_dir = os.path.join(DATA_DIR, "positive")
-    pos_filenames = os.listdir(pos_dir)
-    pos_filenames = [x for x in pos_filenames if ".nii.gz" in x]
-    pos_filenames.sort()
+    sub_dirs = [x for x in os.listdir(DATA_DIR) if os.path.isdir(os.path.join(DATA_DIR, x))]
 
-    neg_dir = os.path.join(DATA_DIR, "negative")
-    neg_filenames = os.listdir(neg_dir)
-    neg_filenames = [x for x in neg_filenames if ".nii.gz" in x]
-    neg_filenames.sort()
+    filenames_dict = {}
+
+    for sub_dir in sub_dirs:
+        filenames = os.listdir(os.path.join(DATA_DIR, sub_dir))
+        filenames_dict[sub_dir] = [x for x in filenames if ".nii" in x]
+        filenames_dict[sub_dir].sort()
 
     ##################### WRITE TF RECORD ######################
     with tf.python_io.TFRecordWriter(TF_RECORD_FILENAME) as writer:
-        for filenames, file_dir in zip([pos_filenames, neg_filenames], [pos_dir, neg_dir]):
+        for file_dir, filenames in filenames_dict.items():
             for x_file in tqdm(filenames):
-                x = nib.load(os.path.join(file_dir, x_file)).get_fdata()
+                x = nib.load(os.path.join(DATA_DIR, file_dir, x_file)).get_fdata()
                 x[np.where(x <= 0)] = 0
 
                 x_patches = get_nonoverlapping_patches(x, PATCH_DIMS)
