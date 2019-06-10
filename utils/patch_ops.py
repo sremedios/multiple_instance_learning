@@ -207,6 +207,8 @@ def get_nonoverlapping_patches(img_vol, patch_size):
                     patches.append(patch)
 
     patches = np.array(patches)
+    if len(patches.shape) != 3:
+        return np.zeros((1, *patch_size))
     patches = np.rollaxis(patches, 2, -1)
     patches = np.reshape(patches, patches.shape + (1,))
 
