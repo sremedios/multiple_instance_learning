@@ -1,5 +1,7 @@
 from tensorflow.keras.layers import Input, Conv3D, MaxPooling3D, AveragePooling3D, concatenate,\
     GlobalAveragePooling3D, GlobalMaxPooling3D, add, UpSampling3D, Dropout, Activation, Dense
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, AveragePooling2D,\
+    GlobalAveragePooling2D, GlobalMaxPooling2D, UpSampling2D
 from tensorflow.keras.models import Model
 
 def tiny_net(num_channels,
@@ -99,6 +101,40 @@ def class_unet(num_channels,
 
     x = GlobalMaxPooling3D()(conv5)
     x = Dense(4, activation='sigmoid')(x)
+
+    model = Model(inputs=inputs, outputs=x)
+
+    return model
+
+def class_unet_2D(num_channels,
+         num_classes,
+         ds=2,
+         lr=1e-4,
+         verbose=0,):
+    inputs = Input((None, None, num_channels))
+
+    conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(inputs)
+    conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(conv1)
+    pool1 = MaxPooling2D(pool_size=2)(conv1)
+
+    conv2 = Conv2D(128//ds, 3, activation='relu', padding='same',)(pool1)
+    conv2 = Conv2D(128//ds, 3, activation='relu', padding='same', )(conv2)
+    pool2 = MaxPooling2D(pool_size=2)(conv2)
+
+    conv3 = Conv2D(256//ds, 3, activation='relu', padding='same', )(pool2)
+    conv3 = Conv2D(256//ds, 3, activation='relu', padding='same', )(conv3)
+    pool3 = MaxPooling2D(pool_size=2)(conv3)
+
+    conv4 = Conv2D(512//ds, 3, activation='relu', padding='same', )(pool3)
+    conv4 = Conv2D(512//ds, 3, activation='relu', padding='same', )(conv4)
+    drop4 = Dropout(0.5)(conv4)
+    pool4 = MaxPooling2D(pool_size=2)(drop4)
+
+    conv5 = Conv2D(1024//ds, 3, activation='relu', padding='same', )(pool4)
+    conv5 = Conv2D(1024//ds, 3, activation='relu', padding='same', )(conv5)
+
+    x = GlobalMaxPooling2D()(conv5)
+    x = Dense(num_classes, activation='sigmoid')(x)
 
     model = Model(inputs=inputs, outputs=x)
 

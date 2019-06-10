@@ -21,11 +21,10 @@ if __name__ == "__main__":
 
     ########## HYPERPARAMETER SETUP ##########
 
-    num_epochs = 1000000
+    N_EPOCHS = 100
     batch_size = 32
     instance_size = (64, 64)
     num_classes = 5
-    start_time = utils.now()
     learning_rate = 1e-4
 
     ########## DIRECTORY SETUP ##########
@@ -43,36 +42,43 @@ if __name__ == "__main__":
             os.makedirs(d)
 
     ######### MODEL AND CALLBACKS #########
-    model = class_unet(num_channels=1,
+    model = class_unet_2D(num_channels=1,
+                        num_classes=num_classes,
                        ds=32,
                        lr=learning_rate,
                        verbose=1,)
 
-    json_string = model.to_json()
-    with open(MODEL_PATH, 'w') as f:
-        json.dump(json_string, f)
+    opt = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
     print(model.summary())
 
     ######### DATA IMPORT #########
-    TRAIN_TF_RECORD_FILENAME = os.path.join(
-        "data", "classification", "train", "dataset.tfrecords")
-    VAL_TF_RECORD_FILENAME = os.path.join(
-        "data", "classification", "val", "dataset.tfrecords")
+    TRAIN_TF_RECORD_FILENAME = "train_dataset.tfrecord"
+    VAL_TF_RECORD_FILENAME = "val_dataset.tfrecord"
+
+    tmp = tf.data.TFRecordDataset(TRAIN_TF_RECORD_FILENAME)\
+        .map(lambda record: parse_bag(
+            record,
+            instance_size,
+            num_labels=num_classes))
+    for num_elements, data in enumerate(tmp):
+        continue
+
+    print("Found {} bags in {}".format(num_elements, TRAIN_TF_RECORD_FILENAME))
 
     train_dataset = tf.data.TFRecordDataset(TRAIN_TF_RECORD_FILENAME)\
         .repeat()\
-        .map(lambda record: parse_classification_example(
+        .map(lambda record: parse_bag(
             record,
-            vol_size,
+            instance_size,
             num_labels=num_classes))\
         .shuffle(buffer_size=100)
 
     val_dataset = tf.data.TFRecordDataset(VAL_TF_RECORD_FILENAME)\
         .repeat()\
-        .map(lambda record: parse_classification_example(
+        .map(lambda record: parse_bag(
             record,
-            vol_size,
+            instance_size,
             num_labels=num_classes))\
         .shuffle(buffer_size=100)
 
@@ -84,45 +90,45 @@ if __name__ == "__main__":
         print("\nEpoch {}/{}".format(cur_epoch + 1, N_EPOCHS))
 
         for i, (x, y) in enumerate(train_dataset):
-            with tf.GradientTape() as tape:
-                repeated_y = np.repeat(y.numpy(), len(x), axis=0)
+            with tf.GradientTape(persistent=True) as tape:
 
                 logits = model(x, training=True)
-
-                losses = tf.losses.sigmoid_cross_entropy(
-                        multi_class_labels=tf.reshape(repeated_y, repeated_y.shape + (1,)),
-                        logits=logits,
-                        reduction=tf.losses.Reduction.NONE
-                    )
-
                 if tf.reduce_sum(y) == 0:
+                    loss= tf.losses.sigmoid_cross_entropy(
+                            multi_class_labels=y,
+                            logits=logits,
+                            reduction=tf.losses.Reduction.MEAN
+                        )
                     # in all-zero class situtation, take mean of entire bag
-                    loss = tf.reduce_mean(losses, axis=0)
                     loss = tf.reshape(loss, (num_classes,1))
-                    grad = tape.gradient(loss, trainable_variables)
+                    grad = tape.gradient(loss, model.trainable_variables)
                     # aggregate current element in batch
                     for k in range(len(grad)):
                         grads[k] = running_average(grads[k], grad[k], i + 1)
+
                 else:
-                    # otherwise, take top instance for each class
+                    # otherwise, take top polluted instance for each class
                     multiclass_grads = [tf.zeros_like(l) for l in model.trainable_variables]
-                    top_polluted_indices = tf.argmax(logits, dimension=0).numpy()[0]
+                    top_polluted_indices = tf.argmax(logits, dimension=0).numpy()
                     # average among top num_classes instances
                     for j, top_polluted_idx in enumerate(top_polluted_indices):
-                        loss = tf.reduce_min(losses[top_polluted_idx], axis=0)
-                        loss = tf.reshape(loss, (num_classes,1))
-                        grad = tape.gradient(loss, trainable_variables)
+                        loss= tf.losses.sigmoid_cross_entropy(
+                                multi_class_labels=y,
+                                logits=logits[top_polluted_idx],
+                                reduction=tf.losses.Reduction.NONE
+                            )
+                        grad = tape.gradient(loss, model.trainable_variables)
                         for k in range(len(grad)):
-                            multiclass_grads = running_average(multiclass_grads, grad[k], j + 1)
+                            multiclass_grads[k] = running_average(multiclass_grads[k], grad[k], j + 1)
                     # aggregate current element in batch
                     for k in range(len(multiclass_grads)):
                         grads[k] = running_average(grads[k], multiclass_grads[k], i + 1)
 
-
-
             if i > 0 and i % batch_size == 0 or i == num_elements - 1:
                 opt.apply_gradients(zip(grads, model.trainable_variables))
+                print("Loss: {:.4f}".format(loss.numpy()[0]))
                 grads = [tf.zeros_like(l) for l in model.trainable_variables]
+                del tape
         
         model.save_weights(os.path.join(WEIGHT_DIR, "mil_weights.tf"))
 
