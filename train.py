@@ -87,6 +87,10 @@ if __name__ == "__main__":
     grads = [tf.zeros_like(l) for l in model.trainable_variables]
 
     for cur_epoch in range(N_EPOCHS):
+        epoch_loss = 0
+        epoch_acc = 0
+        correct = 0
+
         print("\nEpoch {}/{}".format(cur_epoch + 1, N_EPOCHS))
 
         for i, (x, y) in enumerate(train_dataset):
@@ -124,11 +128,33 @@ if __name__ == "__main__":
                     for k in range(len(multiclass_grads)):
                         grads[k] = running_average(grads[k], multiclass_grads[k], i + 1)
 
+
+            # Acc is based off max predictions
+            # TODO: figure out how to handle prediction correctly for multiclass
+            # For now, this is a garbage value
+            pred = tf.reshape(tf.round(tf.reduce_max(logits)), y.shape)
+            if pred.numpy() == y.numpy():
+                correct += 1
+            cur_acc = correct / (i + 1)
+            epoch_loss = running_average(epoch_loss, loss, i + 1)
+            epoch_acc = running_average(epoch_acc, cur_acc, i + 1)
+
+
             if i > 0 and i % batch_size == 0 or i == num_elements - 1:
                 opt.apply_gradients(zip(grads, model.trainable_variables))
-                print("Loss: {:.4f}".format(loss.numpy()[0]))
+                sys.stdout.write("\r[{:{}<{}}] Loss: {:.4f} Acc: {:.2%} = {}/{}".format(
+                    "=" * i,
+                    "-",
+                    progbar_length,
+                    epoch_loss.numpy()[0],
+                    epoch_acc,
+                    correct,
+                    i + 1
+                ))
+                sys.stdout.flush()
+                # wipe tape and records
                 grads = [tf.zeros_like(l) for l in model.trainable_variables]
                 del tape
+
         
         model.save_weights(os.path.join(WEIGHT_DIR, "mil_weights.tf"))
-
