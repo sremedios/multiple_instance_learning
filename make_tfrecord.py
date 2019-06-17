@@ -13,6 +13,7 @@ from utils.pad import *
 from utils import preprocess
 from utils.tfrecord_utils import *
 from utils.patch_ops import *
+from utils.class_mapping import *
 
 
 if __name__ == "__main__":
@@ -30,6 +31,8 @@ if __name__ == "__main__":
     TF_RECORD_FILENAME = sys.argv[3]
 
     PATCH_DIMS = (64, 64)
+
+    class_mapping = read_mapping("class_mapping.pkl")
 
     ######### GET DATA FILENAMES #######
     filenames = [x for x in os.listdir(DATA_DIR) if ".nii" in x]
@@ -49,7 +52,14 @@ if __name__ == "__main__":
                     x_patches = get_nonoverlapping_patches(x, PATCH_DIMS)
                     x_patches = x_patches.astype(np.float16)
 
-                    y_label = np.array(row[5:], dtype=np.int8)
+                    y_label = np.array(row[6:], dtype=np.int8)
+                    '''
+                    y_label = tf.keras.utils.to_categorical(
+                            class_mapping[tuple(y_label)],
+                            len(class_mapping),
+                            dtype='int8',
+                    )
+                    '''
 
                     tf_example = image_example(x_patches, y_label, len(x_patches))
                     writer.write(tf_example.SerializeToString())

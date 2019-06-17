@@ -108,9 +108,7 @@ def class_unet(num_channels,
 
 def class_unet_2D(num_channels,
          num_classes,
-         ds=2,
-         lr=1e-4,
-         verbose=0,):
+         ds=2,):
     inputs = Input((None, None, num_channels))
 
     conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(inputs)
@@ -134,7 +132,7 @@ def class_unet_2D(num_channels,
     conv5 = Conv2D(1024//ds, 3, activation='relu', padding='same', )(conv5)
 
     x = GlobalMaxPooling2D()(conv5)
-    x = Dense(num_classes, activation='sigmoid')(x)
+    x = Dense(num_classes)(x)
 
     model = Model(inputs=inputs, outputs=x)
 
