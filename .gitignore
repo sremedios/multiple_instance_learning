@@ -2,3 +2,4 @@
 **.swp
 **/models/weights/*
 *.tfrecord
+**/data/*

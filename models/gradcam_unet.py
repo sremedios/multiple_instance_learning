@@ -1,9 +1,8 @@
-import tensorflow as tf
-from tensorflow.keras.layers import Input, Conv3D, MaxPooling3D, AveragePooling3D, concatenate,\
+from keras.layers import Input, Conv3D, MaxPooling3D, AveragePooling3D, concatenate,\
     GlobalAveragePooling3D, GlobalMaxPooling3D, add, UpSampling3D, Dropout, Activation, Dense
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, AveragePooling2D,\
+from keras.layers import Conv2D, MaxPooling2D, AveragePooling2D,\
     GlobalAveragePooling2D, GlobalMaxPooling2D, UpSampling2D, BatchNormalization
-from tensorflow.keras.models import Model
+from keras.models import Model
 
 def tiny_net(num_channels,
              lr=1e-4):
@@ -27,9 +26,9 @@ def unet(num_channels,
 
     conv1 = Conv3D(64//ds, 3, activation='relu', padding='same', )(inputs)
     conv1 = Conv3D(64//ds, 3, activation='relu', padding='same', )(conv1)
-    pool2 = MaxPooling3D(pool_size=2)(conv1)
+    pool1 = MaxPooling3D(pool_size=2)(conv1)
 
-    conv2 = Conv3D(128//ds, 3, activation='relu', padding='same',)(pool2)
+    conv2 = Conv3D(128//ds, 3, activation='relu', padding='same',)(pool1)
     conv2 = Conv3D(128//ds, 3, activation='relu', padding='same', )(conv2)
     pool2 = MaxPooling3D(pool_size=2)(conv2)
 
@@ -82,9 +81,9 @@ def class_unet(num_channels,
 
     conv1 = Conv3D(64//ds, 3, activation='relu', padding='same', )(inputs)
     conv1 = Conv3D(64//ds, 3, activation='relu', padding='same', )(conv1)
-    pool2 = MaxPooling3D(pool_size=2)(conv1)
+    pool1 = MaxPooling3D(pool_size=2)(conv1)
 
-    conv2 = Conv3D(128//ds, 3, activation='relu', padding='same',)(pool2)
+    conv2 = Conv3D(128//ds, 3, activation='relu', padding='same',)(pool1)
     conv2 = Conv3D(128//ds, 3, activation='relu', padding='same', )(conv2)
     pool2 = MaxPooling3D(pool_size=2)(conv2)
 
@@ -107,81 +106,32 @@ def class_unet(num_channels,
 
     return model
 
-def class_unet_2D(num_channels,
+def class_unet_2D(img_shape,
+                  num_channels,
                   num_classes,
                   ds=2,):
-    inputs = Input((None, None, num_channels))
+    #inputs = Input((None, None, num_channels))
+    inputs = Input(img_shape)
 
-    conv1 = Conv2D(
-            64//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(inputs)
-    conv1 = Conv2D(
-            64//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(conv1)
-    pool2 = MaxPooling2D(pool_size=2)(conv1)
+    conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(inputs)
+    conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(conv1)
+    pool1 = MaxPooling2D(pool_size=2)(conv1)
 
-    conv2 = Conv2D(
-            128//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(pool2)
-    conv2 = Conv2D(
-            128//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(conv2)
+    conv2 = Conv2D(128//ds, 3, activation='relu', padding='same',)(pool1)
+    conv2 = Conv2D(128//ds, 3, activation='relu', padding='same', )(conv2)
     pool2 = MaxPooling2D(pool_size=2)(conv2)
 
-    conv3 = Conv2D(
-            256//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(pool2)
-    conv3 = Conv2D(
-            256//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(conv3)
+    conv3 = Conv2D(256//ds, 3, activation='relu', padding='same', )(pool2)
+    conv3 = Conv2D(256//ds, 3, activation='relu', padding='same', )(conv3)
     pool3 = MaxPooling2D(pool_size=2)(conv3)
 
-    conv4 = Conv2D(
-            512//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(pool3)
-    conv4 = Conv2D(
-            512//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(conv4)
+    conv4 = Conv2D(512//ds, 3, activation='relu', padding='same', )(pool3)
+    conv4 = Conv2D(512//ds, 3, activation='relu', padding='same', )(conv4)
     drop4 = Dropout(0.5)(conv4)
     pool4 = MaxPooling2D(pool_size=2)(drop4)
 
-    conv5 = Conv2D(
-            1024//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(pool4)
-    drop5 = Dropout(0.5)(conv5)
-    conv5 = Conv2D(
-            1024//ds, 
-            3, 
-            activation='relu', 
-            padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(drop5)
+    conv5 = Conv2D(1024//ds, 3, activation='relu', padding='same', )(pool4)
+    conv5 = Conv2D(1024//ds, 3, activation='relu', padding='same', )(conv5)
 
     x = GlobalMaxPooling2D()(conv5)
     x = Dense(num_classes)(x)
@@ -193,16 +143,17 @@ def class_unet_2D(num_channels,
 def new_class_unet_2D(num_channels,
                       num_classes,
                       ds=2,):
-    inputs = Input((None, None, num_channels))
+    #inputs = Input((None, None, num_channels))
+    inputs = Input((250, 250, num_channels))
 
     conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(inputs)
     bn1 = BatchNormalization()(conv1)
     do1 = Dropout(0.5)(bn1)
     conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(do1)
     bn1 = BatchNormalization()(conv1)
-    pool2 = MaxPooling2D(pool_size=2)(conv1)
+    pool1 = MaxPooling2D(pool_size=2)(conv1)
 
-    conv2 = Conv2D(128//ds, 3, activation='relu', padding='same', )(pool2)
+    conv2 = Conv2D(128//ds, 3, activation='relu', padding='same', )(pool1)
     bn2 = BatchNormalization()(conv2)
     do2 = Dropout(0.5)(bn2)
     conv2 = Conv2D(128//ds, 3, activation='relu', padding='same', )(do2)
