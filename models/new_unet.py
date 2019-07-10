@@ -22,7 +22,7 @@ def tiny_net(num_channels,
 def unet(num_channels,
          ds=2,
          lr=1e-4,
-         verbose=0,):
+         ):
     inputs = Input((None, None, None, num_channels))
 
     conv1 = Conv3D(64//ds, 3, activation='relu', padding='same', )(inputs)
@@ -166,8 +166,8 @@ def class_unet_2D(num_channels,
             activation='relu', 
             padding='same', 
             kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(conv4)
-    drop4 = Dropout(0.5)(conv4)
-    pool4 = MaxPooling2D(pool_size=2)(drop4)
+    #drop4 = Dropout(0.5)(conv4)
+    pool4 = MaxPooling2D(pool_size=2)(conv4)
 
     conv5 = Conv2D(
             1024//ds, 
@@ -175,13 +175,13 @@ def class_unet_2D(num_channels,
             activation='relu', 
             padding='same', 
             kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(pool4)
-    drop5 = Dropout(0.5)(conv5)
+    #drop5 = Dropout(0.5)(conv5)
     conv5 = Conv2D(
             1024//ds, 
             3, 
             activation='relu', 
             padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(drop5)
+            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(conv5)
 
     x = GlobalMaxPooling2D()(conv5)
     x = Dense(num_classes)(x)

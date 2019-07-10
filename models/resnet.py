@@ -39,10 +39,10 @@ def resnet(num_classes, num_channels=1, ds=2):
         block = Activation('relu')(x)
 
     x = GlobalMaxPooling2D()(block)
-    x = Dense(256//ds)(x)
-    x = Dropout(0.5)(x)
-    x = Dense(128//ds)(x)
-    x = Dropout(0.5)(x)
+    #x = Dense(256//ds)(x)
+    #x = Dropout(0.5)(x)
+    #x = Dense(128//ds)(x)
+    #x = Dropout(0.5)(x)
     outputs = Dense(num_classes)(x)
 
     model = Model(inputs=inputs, outputs=outputs)

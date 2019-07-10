@@ -112,7 +112,7 @@ def get_patches(invols, mask, patchsize, maxpatch, num_channels):
 
     mask = np.asarray(mask, dtype=np.float32)
     patch_size = np.asarray(patchsize, dtype=int)
-    dsize = np.floor(patchsize/2).astype(dtype=int)
+    dsize = np.floor(patch_size/2).astype(dtype=int)
 
     # find indices of all lesions in mask volume
     mask_lesion_indices = np.nonzero(mask)
@@ -163,24 +163,40 @@ def get_patches(invols, mask, patchsize, maxpatch, num_channels):
     CT_matsize = (2*num_patches, patchsize[0], patchsize[1], num_channels)
     Mask_matsize = (2*num_patches, patchsize[0], patchsize[1], 1)
 
-    CTPatches = np.ndarray(CT_matsize, dtype=np.float16)
-    MaskPatches = np.ndarray(Mask_matsize, dtype=np.float16)
+    #CTPatches = np.ndarray(CT_matsize, dtype=np.float16)
+    #MaskPatches = np.ndarray(Mask_matsize, dtype=np.float16)
+
+    CTPatches = []
+    MaskPatches = []
 
     for i in range(0, 2*num_patches):
         I = newidx[0, i]
         J = newidx[1, i]
         K = newidx[2, i]
 
-        for c in range(num_channels):
-            CTPatches[i, :, :, c] = invols[c][I - dsize[0]: I + dsize[0],
-                                              J - dsize[1]: J + dsize[1],
-                                              K]
-        MaskPatches[i, :, :, 0] = mask[I - dsize[0]: I + dsize[0],
-                                       J - dsize[1]:J + dsize[1],
-                                       K]
+        if I - dsize[0] < 0 or\
+                I + dsize[0] > invols[0].shape[0] or\
+                J - dsize[1] < 0 or\
+                J + dsize[1] > invols[0].shape[1]:
+                    continue
 
-    CTPatches = np.asarray(CTPatches, dtype=np.float16)
-    MaskPatches = np.asarray(MaskPatches, dtype=np.float16)
+        if np.sum(
+            invols[0][I - dsize[0]: I + dsize[0],
+                      J - dsize[1]: J + dsize[1],
+                      K]
+                ) == 0:
+            continue
+
+        for c in range(num_channels):
+            CTPatches.append(invols[c][I - dsize[0]: I + dsize[0],
+                                              J - dsize[1]: J + dsize[1],
+                                              K])
+        MaskPatches.append(mask[I - dsize[0]: I + dsize[0],
+                                       J - dsize[1]:J + dsize[1],
+                                       K])
+
+    #CTPatches = np.asarray(CTPatches, dtype=np.float16)
+    #MaskPatches = np.asarray(MaskPatches, dtype=np.float16)
 
     return CTPatches, MaskPatches
 

@@ -29,7 +29,7 @@ if __name__ == "__main__":
     DATA_DIR = sys.argv[1]
     df = pd.read_csv(sys.argv[2])
     TF_RECORD_FILENAME = os.path.join(
-            "data", "dataset_fold_{}_{}.tfrecord"
+            "data", "tmp_dataset_fold_{}_{}.tfrecord"
     )
 
     PATCH_DIMS = (128, 128)
@@ -87,10 +87,6 @@ if __name__ == "__main__":
         neg_idx[LIMIT_TRAIN_SPLIT:],
     ])
 
-    # shuffle indices for randomness
-    train_idx = shuffle(train_idx, random_state=4)
-    test_idx = shuffle(test_idx, random_state=4)
-
     X_test = X[test_idx]
     y_test = y[test_idx]
 
@@ -121,6 +117,10 @@ if __name__ == "__main__":
                 else:
                     y_label = np.array([0, 1], dtype=np.int8)
                     train_pos += 1
+                    # make half the positive patches a special value
+                    # special value will be 1500
+                    for j in range(x_patches.shape[0]//2):
+                        x_patches[j * 2] = x_patches[j * 2] * 0 + 1500.0
 
                 tf_example = image_example(x_patches, y_label, len(x_patches))
                 writer.write(tf_example.SerializeToString())
@@ -145,6 +145,10 @@ if __name__ == "__main__":
                 else:
                     y_label = np.array([0, 1], dtype=np.int8)
                     val_pos += 1
+                    # make half the positive patches a special value
+                    # special value will be 1500
+                    for j in range(x_patches.shape[0]//2):
+                        x_patches[j * 2] = x_patches[j * 2] * 0 + 1500.0
 
                 tf_example = image_example(x_patches, y_label, len(x_patches))
                 writer.write(tf_example.SerializeToString())
@@ -169,6 +173,10 @@ if __name__ == "__main__":
             else:
                 y_label = np.array([0, 1], dtype=np.int8)
                 test_pos += 1
+                # make half the positive patches a special value
+                # special value will be 1500
+                for j in range(x_patches.shape[0]//2):
+                    x_patches[j * 2] = x_patches[j * 2] * 0 + 1500.0
 
             tf_example = image_example(x_patches, y_label, len(x_patches))
             writer.write(tf_example.SerializeToString())

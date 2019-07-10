@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     ########## HYPERPARAMETER SETUP ##########
 
-    instance_size = (128, 128)
+    instance_size = (256, 256)
     num_classes = 2
     NUM_FOLDS = 5
 
@@ -36,14 +36,16 @@ if __name__ == "__main__":
     WEIGHT_DIR = os.path.join("models", "weights")
 
     MODEL_NAME = "class_unet" 
-    MODEL_PATH = os.path.join("models", "weights", "class_resnet.json")
+    MODEL_PATH = os.path.join("models", "weights", MODEL_NAME + ".json")
     with open(MODEL_PATH) as json_data:
         model = tf.keras.models.model_from_json(json.load(json_data))
             
 
     ######### DATA IMPORT #########
     VAL_TF_RECORD_FILENAME = os.path.join(
-            "data", "dataset_fold_{}_val.tfrecord")
+        "data", 
+        "dataset_fold_{}_val.tfrecord"
+    )
 
     classwise_pred_all_folds = [0 for _ in range(num_classes)]
     classwise_total_all_folds = [0 for _ in range(num_classes)]

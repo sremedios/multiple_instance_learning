@@ -27,23 +27,25 @@ if __name__ == "__main__":
 
     ########## HYPERPARAMETER SETUP ##########
 
-    instance_size = (64, 64)
+    instance_size = (256, 256)
     num_classes = 2
-    NUM_FOLDS = 3
+    NUM_FOLDS = 5
 
     ########## DIRECTORY SETUP ##########
 
     WEIGHT_DIR = os.path.join("models", "weights")
 
     MODEL_NAME = "class_unet" 
-    MODEL_PATH = os.path.join("models", "weights", "class_resnet.json")
+    MODEL_PATH = os.path.join("models", "weights", MODEL_NAME + ".json")
     with open(MODEL_PATH) as json_data:
         model = tf.keras.models.model_from_json(json.load(json_data))
             
 
     ######### DATA IMPORT #########
-    #TEST_TF_RECORD_FILENAME = "dataset_fold___test.tfrecord"
-    TEST_TF_RECORD_FILENAME = "dataset_fold_4_val.tfrecord"
+    TEST_TF_RECORD_FILENAME = os.path.join(
+        "data",
+        "dataset_fold___test.tfrecord"
+    )
 
     test_dataset = tf.data.TFRecordDataset(TEST_TF_RECORD_FILENAME)\
         .map(lambda record: parse_bag(
@@ -64,7 +66,10 @@ if __name__ == "__main__":
     for i, (x, y) in tqdm(enumerate(test_dataset), total=num_bags):
         pred = tf.zeros((2,)) 
         for cur_fold in range(NUM_FOLDS):
-            WEIGHT_PATH = os.path.join(WEIGHT_DIR, "best_weights_fold_{}.h5".format(cur_fold))
+            WEIGHT_PATH = os.path.join(
+                WEIGHT_DIR, 
+                "best_weights_fold_{}.h5".format(cur_fold)
+            )
             model.load_weights(WEIGHT_PATH)
 
             logits = model(x)
