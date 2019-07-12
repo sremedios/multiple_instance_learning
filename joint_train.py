@@ -32,7 +32,7 @@ if __name__ == "__main__":
     ########## HYPERPARAMETER SETUP ##########
 
     N_EPOCHS = 10000
-    batch_size = 96//4
+    batch_size = 96
     minibatch_size = 16
     ds = 4
     instance_size = (128, 128)
@@ -80,10 +80,10 @@ if __name__ == "__main__":
     )
 
     TRAIN_SEG_TF_RECORD_FILENAME = os.path.join(
-            "data", "dataset_fold_{}_train.tfrecord"
+            "data", "seg_dataset_fold_{}_train.tfrecord"
     )
     VAL_SEG_TF_RECORD_FILENAME = os.path.join(
-            "data", "dataset_fold_{}_val.tfrecord"
+            "data", "seg_dataset_fold_{}_val.tfrecord"
     )
 
     for cur_fold in range(5):

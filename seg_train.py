@@ -33,11 +33,10 @@ if __name__ == "__main__":
     ########## HYPERPARAMETER SETUP ##########
 
     N_EPOCHS = 10000
-    batch_size = 96//4
+    batch_size = 4096
     minibatch_size = 16
     ds = 4
     instance_size = (128, 128)
-    num_classes = 2
     learning_rate = 1e-4
     progbar_length = 10
     CONVERGENCE_EPOCH_LIMIT = 50
@@ -56,7 +55,7 @@ if __name__ == "__main__":
         if not os.path.exists(d):
             os.makedirs(d)
 
-    model = unet(
+    model = unet_2D(
         num_channels=1,
         ds=ds,
     )
@@ -93,6 +92,9 @@ if __name__ == "__main__":
                 record,
                 instance_size,
                 ))
+
+        print("Counting elements...")
+        start_time = time.time()
         for num_seg_elements, data in enumerate(seg_tmp):
             continue
         num_seg_elements += 1
@@ -103,24 +105,29 @@ if __name__ == "__main__":
         print("Using {} as epoch limit".format(
             num_seg_elements)
         )
+        print("Took {:.2f}s to count all elements".format(
+            time.time() - start_time)
+        )
 
         #augmentations = [flip_dim1, flip_dim2, flip_dim3, rotate_2D]
         augmentations = []
 
         train_seg_dataset = tf.data.TFRecordDataset(
-                TRAIN_CLASS_TF_RECORD_FILENAME.format(cur_fold))\
+                TRAIN_SEG_TF_RECORD_FILENAME.format(cur_fold))\
             .map(lambda record: parse_seg_bag(
                 record,
                 instance_size,
-                ))\
+                )
+            )\
             .shuffle(buffer_size=100)
 
         val_seg_dataset = tf.data.TFRecordDataset(
-                VAL_CLASS_TF_RECORD_FILENAME.format(cur_fold))\
+                VAL_SEG_TF_RECORD_FILENAME.format(cur_fold))\
             .map(lambda record: parse_seg_bag(
                 record,
                 instance_size,
-                ))\
+                )
+            )
 
         for f in augmentations:
             train_seg_dataset = train_seg_dataset.map(
@@ -132,8 +139,7 @@ if __name__ == "__main__":
                     
         ######### TRAINING #########
 
-        best_val_loss = 100000
-        best_val_acc = 0
+        best_val_seg_loss = 100000
         convergence_epoch_counter = 0
 
         seg_grads = [tf.zeros_like(l) for l in model.trainable_variables]
@@ -142,16 +148,13 @@ if __name__ == "__main__":
 
         best_epoch = 1
         for cur_epoch in range(N_EPOCHS):
-            epoch_train_class_loss = 0
             epoch_train_seg_loss = 0
-            epoch_train_class_acc = 0
             train_correct = 0
 
-            epoch_val_loss = 0
-            epoch_val_acc = 0
+            epoch_val_seg_loss = 0
+            epoch_val_seg_acc = 0
             val_correct = 0
 
-            #print("\nEpoch {}/{}".format(cur_epoch + 1, N_EPOCHS))
             sys.stdout.write("\rEpoch {}/{} [{:{}<{}}]".format(
                 cur_epoch + 1, N_EPOCHS, 
                 "=" * 0, '-', progbar_length
@@ -179,17 +182,16 @@ if __name__ == "__main__":
 
 
                 # apply gradients per batch
-                if (i > 0 and i % batch_size == 0) or i == num_class_elements - 1:
+                if (i > 0 and i % batch_size == 0) or i == num_seg_elements - 1:
                     opt.apply_gradients(zip(seg_grads, model.trainable_variables))
-                    sys.stdout.write("\rEpoch {}/{} [{:{}<{}}] \
-                            Seg Loss: {:.4f}".format(
+                    sys.stdout.write("\rEpoch {}/{} [{:{}<{}}] Seg Loss: {:.4f}".format(
                         cur_epoch + 1, N_EPOCHS,
                         "=" * min(
-                            int(progbar_length * (i/num_class_elements)), 
+                            int(progbar_length * (i/num_seg_elements)), 
                             progbar_length),
                         "-",
                         progbar_length,
-                        epoch_train_class_loss,
+                        epoch_train_seg_loss,
                     ))
                     sys.stdout.flush()
                     # wipe tape and records
@@ -201,7 +203,7 @@ if __name__ == "__main__":
                 seg_out = model(seg_x, training=True)
 
                 # segmentation gradient
-                seg_loss = continuous_dice_coef_loss(
+                seg_loss = dice_coef_loss(
                         seg_out, 
                         seg_y,
                     )
@@ -240,8 +242,6 @@ if __name__ == "__main__":
                     WEIGHT_DIR, "best_weights_fold_{}.h5".format(cur_fold))
                 )
 
-            sys.stdout.write(" Val Loss: {:.4f} Val Acc: {:.2%}".format(
+            sys.stdout.write(" Val Loss: {:.4f}".format(
                 epoch_val_seg_loss,
-                epoch_val_seg_acc
             ))
-

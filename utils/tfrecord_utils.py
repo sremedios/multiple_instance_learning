@@ -67,11 +67,11 @@ def parse_seg_bag(record, instance_size, ):
     image_features = tf.parse_single_example(record, features=features)
 
     x = tf.decode_raw(image_features.get('X'), tf.float64)
-    x = tf.reshape(x, (*instance_size, 1))
-    #x = tf.cast(x, tf.float32)
+    x = tf.reshape(x, (1, *instance_size, 1))
+    x = tf.cast(x, tf.float32)
 
     y = tf.decode_raw(image_features.get('Y'), tf.float32)
-    y = tf.reshape(y, (*instance_size, 1))
-    #y = tf.cast(y, tf.float32)
+    y = tf.reshape(y, (1, *instance_size, 1))
+    y = tf.cast(y, tf.float32)
 
     return x, y
