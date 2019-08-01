@@ -6,3 +6,5 @@
 **/results/*
 **/*.png
 **/*.eps
+**/*.pyc
+**/figures/*
