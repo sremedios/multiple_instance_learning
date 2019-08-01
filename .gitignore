@@ -3,3 +3,6 @@
 **/models/weights/*
 *.tfrecord
 **/data/*
+**/results/*
+**/*.png
+**/*.eps
