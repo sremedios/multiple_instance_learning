@@ -50,3 +50,40 @@ def pad_image(img_data, target_dims=None):
         new_img = new_img[:,:,:,0]
 
     return new_img
+
+def center_crop(img, target_dims):
+    width = img.shape[1]
+    height = img.shape[0]
+
+    new_width = target_dims[1]
+    new_height = target_dims[0]
+
+    left = int(np.ceil((width - new_width) / 2))
+    right = width - int(np.floor((width - new_width) / 2))
+
+    top = int(np.ceil((height - new_height) / 2))
+    bottom = height - int(np.floor((height - new_height) / 2))
+
+    center_cropped_img = img[top:bottom, left:right]
+
+    return center_cropped_img
+
+def pad_crop_image_2D(img_data, target_dims=None):
+
+    img_data = center_crop(img_data, target_dims)
+
+    left_pad = round(float(target_dims[0] - img_data.shape[0]) / 2)
+    right_pad = round(float(target_dims[0] - img_data.shape[0]) - left_pad)
+    top_pad = round(float(target_dims[1] - img_data.shape[1]) / 2)
+    bottom_pad = round(float(target_dims[1] - img_data.shape[1]) - top_pad)
+
+    pads = (
+        (left_pad, right_pad),
+        (top_pad, bottom_pad),
+    )
+    
+    new_img = np.zeros((target_dims))
+
+    new_img[:,:] = np.pad(img_data[:,:,], pads, 'constant', constant_values=0)
+
+    return new_img

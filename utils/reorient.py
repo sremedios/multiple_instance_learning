@@ -27,7 +27,7 @@ def orient(filename, src_dir, dst_dir, verbose=0):
     if verbose == 1:
         print("Orienting to " + target_orientation+"...")
 
-    call = "3dresample -orient" + " " + target_orientation + " " +\
+    call = "~/abin/3dresample -orient" + " " + target_orientation + " " +\
         "-inset" + " " + infile + " " +\
         "-prefix" + " " + outfile
     os.system(call)

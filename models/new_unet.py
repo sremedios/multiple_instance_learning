@@ -165,13 +165,19 @@ def class_unet_2D(num_channels,
                   num_classes,
                   ds=2,):
     inputs = Input((None, None, num_channels))
+    # adding some earlier maxpooling to help
+
+    x = Conv2D(32//ds, 3, activation='relu', padding='same', )(inputs)
+    x = MaxPooling2D(pool_size=2)(x)
+    x = Conv2D(32//ds, 3, activation='relu', padding='same', )(x)
+    x = MaxPooling2D(pool_size=2)(x)
 
     conv1 = Conv2D(
             64//ds, 
             3, 
             activation='relu', 
             padding='same', 
-            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(inputs)
+            kernel_regularizer=tf.keras.regularizers.l2(l=5e-4))(x)
     conv1 = Conv2D(
             64//ds, 
             3, 
@@ -249,7 +255,14 @@ def new_class_unet_2D(num_channels,
                       ds=2,):
     inputs = Input((None, None, num_channels))
 
-    conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(inputs)
+    # adding some earlier maxpooling to help
+
+    x = Conv2D(32//ds, 3, activation='relu', padding='same', )(inputs)
+    x = MaxPooling2D(pool_size=2)(x)
+    x = Conv2D(32//ds, 3, activation='relu', padding='same', )(x)
+    x = MaxPooling2D(pool_size=2)(x)
+
+    conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(x)
     bn1 = BatchNormalization()(conv1)
     do1 = Dropout(0.5)(bn1)
     conv1 = Conv2D(64//ds, 3, activation='relu', padding='same', )(do1)

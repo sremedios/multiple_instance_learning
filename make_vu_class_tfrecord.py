@@ -26,18 +26,55 @@ if __name__ == "__main__":
 
     ######### DIRECTRY SETUP #########
 
-    DATA_DIR = sys.argv[1]
-    df = pd.read_csv(sys.argv[2])
+    manual_check_file = sys.argv[1]
+    healthy_lines = []
+    with open(manual_check_file, 'r') as f:
+        lines = f.readlines()
+        for l in lines:
+            if int(l.strip().split()[-1]) == 0:
+                healthy_lines.append(l.strip().split())
+
+    severe_file = sys.argv[2]
+    with open(severe_file, 'r') as f:
+        severe_lines = [l.strip() for l in f.readlines()]
+    
+    
     TF_RECORD_FILENAME = os.path.join(
-            "data", "dataset_fold_{}_{}.tfrecord"
+            os.sep, "home", "remedis", "data", "dataset_fold_{}_{}.tfrecord"
     )
 
-    PATCH_DIMS = (128, 128)
+    TARGET_DIMS = (512, 512) 
 
     ######### GET DATA FILENAMES #######
-    filenames = [x for x in os.listdir(DATA_DIR) if ".nii" in x]
-    filenames.sort()
 
+    filenames = []
+    scores = []
+    omitted = []
+
+    # severe lesions
+    for l in tqdm(severe_lines):
+        f = l.replace("_predicted_mask.nii.gz", ".nii.gz").replace("mask", "preprocessed")
+        if not os.path.exists(f):
+            omitted.append(f)
+            continue
+        filenames.append(f)
+        scores.append(1)
+
+    print(len(filenames), "severe")
+
+    # healthy subjects
+    for l in tqdm(healthy_lines):
+        if int(l[-1]) == 0:
+            f = l[0].replace(".png", ".nii.gz").replace("mask", "preprocessed")
+            if not os.path.exists(f):
+                omitted.append(f)
+                continue
+            filenames.append(f)
+            scores.append(int(l[-1]))
+
+    print(len(filenames), "healthy")
+
+        
     pos_count = 0
     neg_count = 0
 
@@ -45,19 +82,26 @@ if __name__ == "__main__":
     y = []
 
     ######### PAIR FILENAME WITH CLASS #########
-    for x_file in filenames:
-        for row in df.itertuples():
-            if row[3] in x_file:
-                # no finding is labeled 0
-                if np.sum(row[6:]) == 0:
-                    X.append(x_file)
-                    y.append(0)
-                    neg_count += 1
-                # extraaxial hematoma is labeled 1
-                elif row[6] == 1:
-                    X.append(x_file)
-                    y.append(1)
-                    pos_count += 1
+    for x_file, y_score in zip(filenames, scores):
+        # no finding is labeled 0
+        if y_score == 0:
+            X.append(x_file)
+            y.append(0)
+            neg_count += 1
+        # Zihao scores have 3 as guaranteed hematoma
+        # 1 is possibly hematoma
+        elif y_score == 1:
+            X.append(x_file)
+            y.append(1)
+            pos_count += 1
+
+    print("Num positive: {} Num negative: {}".format(
+        pos_count,
+        neg_count,
+        )
+    )
+
+    print("Omitted {}".format(len(omitted)))
 
     X = np.array(X)
     y = np.array(y)
@@ -87,7 +131,7 @@ if __name__ == "__main__":
         neg_idx[LIMIT_TRAIN_SPLIT:],
     ])
 
-    # shuffle for randomness
+    # shuffle indices for randomness
     train_idx = shuffle(train_idx, random_state=4)
     test_idx = shuffle(test_idx, random_state=4)
 
@@ -98,7 +142,6 @@ if __name__ == "__main__":
     X = X[train_idx]
     y = y[train_idx]
 
-
     ######### 5-FOLD TRAIN/VAL SPLIT #########
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=4)
 
@@ -108,12 +151,15 @@ if __name__ == "__main__":
             train_pos = 0
             train_neg = 0
             for train_i in tqdm(train_idx):
-                x = nib.load(
-                        os.path.join(DATA_DIR, X[train_i])
-                    ).get_fdata()
+                try:
+                    x = nib.load(X[train_i]).get_fdata()
+                except EOFError:
+                    print("Error loading {}, omitting".format(X[train_i]))
+                    continue
+
                 x[np.where(x <= 0)] = 0
 
-                x_patches = get_nonoverlapping_patches(x, PATCH_DIMS)
+                x_patches = get_slices(x, TARGET_DIMS)
                 x_patches = x_patches.astype(np.float16)
 
                 if y[train_i] == 0:
@@ -132,12 +178,14 @@ if __name__ == "__main__":
             val_pos = 0
             val_neg = 0
             for val_i in tqdm(val_idx):
-                x = nib.load(
-                        os.path.join(DATA_DIR, X[val_i])
-                    ).get_fdata()
+                try:
+                    x = nib.load(X[val_i]).get_fdata()
+                except EOFError:
+                    print("Error loading {}, omitting".format(X[val_i]))
+                    continue
                 x[np.where(x <= 0)] = 0
 
-                x_patches = get_nonoverlapping_patches(x, PATCH_DIMS)
+                x_patches = get_slices(x, TARGET_DIMS)
                 x_patches = x_patches.astype(np.float16)
 
                 if y[val_i] == 0:
@@ -156,12 +204,15 @@ if __name__ == "__main__":
         test_pos = 0
         test_neg = 0
         for x_test_name, y_test_label in tqdm(zip(X_test, y_test), total=len(X_test)):
-            x = nib.load(
-                    os.path.join(DATA_DIR, x_test_name)
-                ).get_fdata()
+            try:
+                x = nib.load(x_test_name).get_fdata()
+            except EOFError:
+                print("Error loading {}, omitting".format(x_test_name))
+                continue
+
             x[np.where(x <= 0)] = 0
 
-            x_patches = get_nonoverlapping_patches(x, PATCH_DIMS)
+            x_patches = get_slices(x, TARGET_DIMS)
             x_patches = x_patches.astype(np.float16)
 
             if y_test_label == 0:
@@ -174,4 +225,3 @@ if __name__ == "__main__":
             tf_example = image_example(x_patches, y_label, len(x_patches))
             writer.write(tf_example.SerializeToString())
     print("Test pos: {} Test neg: {}".format(test_pos, test_neg))
-

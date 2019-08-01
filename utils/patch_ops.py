@@ -3,7 +3,7 @@ import numpy as np
 import nibabel as nib
 from sklearn.utils import shuffle
 from tqdm import tqdm
-from .pad import pad_image
+from .pad import *
 import random
 import copy
 from time import strftime, time
@@ -199,6 +199,22 @@ def get_patches(invols, mask, patchsize, maxpatch, num_channels):
     #MaskPatches = np.asarray(MaskPatches, dtype=np.float16)
 
     return CTPatches, MaskPatches
+
+def get_slices(img_vol, target_size):
+    num_z_steps = img_vol.shape[2]
+
+    slices = []
+    for z in range(num_z_steps):
+        sl = img_vol[:, :, z]
+        sl = pad_crop_image_2D(sl, target_size)
+
+        if np.sum(sl) > 0:
+            slices.append(sl)
+
+    slices = np.array(slices)
+    slices = np.reshape(slices, slices.shape + (1,))
+
+    return slices
 
 
 def get_nonoverlapping_patches(img_vol, patch_size):
