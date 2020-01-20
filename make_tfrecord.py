@@ -1,7 +1,8 @@
-import numpy as np
-import os
 import sys
-import pandas as pd
+from pathlib import Path
+
+import numpy as np
+from tqdm import tqdm
 
 import tensorflow as tf
 import nibabel as nib
@@ -9,169 +10,184 @@ import nibabel as nib
 from sklearn.utils import shuffle
 from sklearn.model_selection import StratifiedKFold
 
-from tqdm import tqdm
-from utils.pad import *
-from utils import preprocess
 from utils.tfrecord_utils import *
 from utils.patch_ops import *
 
+def intensity_normalize(x):
+    x = (x - x.min()) / (x.max() - x.min())
+    return x
+
+def clip_negatives(x):
+    x[np.where(x <= 0)] = 0
+    return x
+
+def prepare_data(x_filename, y_label, num_classes):
+    x = nib.load(str(x_filename)).get_fdata()
+    x = clip_negatives(x)
+    x_slices = get_axial_slices(x, TARGET_DIMS)
+    x_slices = x_slices.astype(np.float32)
+
+    y = np.zeros((num_classes,), dtype=np.uint8)
+    y[y_label] = 1
+
+    return x_slices, y
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Missing cmd line argument")
+    if len(sys.argv) < 3:
+        print(
+                ("Missing cmd line arguments.\n")
+                ("First argument: source of data.\n")
+                ("Second argument: destination folder for TFRecords.\n")
+             )
         sys.exit()
-
-    tf.enable_eager_execution()
-    os.environ['FSLOUTPUTTYPE'] = 'NIFTI_GZ'
 
     ######### DIRECTRY SETUP #########
 
-    DATA_DIR = sys.argv[1]
-    df = pd.read_csv(sys.argv[2])
-    TF_RECORD_FILENAME = os.path.join(
-            "data", "dataset_fold_{}_{}.tfrecord"
-    )
+    # pass the preprocessed data directory here
+    IN_DATA_DIR = Path(sys.argv[1])
+    OUT_DATA_DIR = Path(sys.argv[2])
 
-    PATCH_DIMS = (128, 128)
+    if not OUT_DATA_DIR.exists():
+        OUT_DATA_DIR.mkdir(parents=True)
+
+    TF_RECORD_FILENAME = OUT_DATA_DIR / "dataset_fold_{}_{}.tfrecord"
+    TEST_FILENAMES_FILE = OUT_DATA_DIR / "test_filenames_labels.txt"
+
+    # write which filenames and classes for train/val/test
+    train_filenames_file = OUT_DATA_DIR / "train_filenames_fold_{}.txt"
+    val_filenames_file = OUT_DATA_DIR / "val_filenames_fold_{}.txt"
+    test_filenames_file = OUT_DATA_DIR /"test_filenames_fold_{}.txt"
+
+    # write the number of instances/bags for progress bar purposes
+    count_file = OUT_DATA_DIR / "count.txt"
+
+    TARGET_DIMS = (512, 512)
 
     ######### GET DATA FILENAMES #######
-    filenames = [x for x in os.listdir(DATA_DIR) if ".nii" in x]
-    filenames.sort()
+    classes = sorted([d for d in IN_DATA_DIR.iterdir() if d.is_dir()])
+    class_mapping = {c.name:i for i, c in enumerate(classes)}
+    class_mapping_inv = {v:k for k, v in class_mapping.items()}
 
-    pos_count = 0
-    neg_count = 0
-
-    X = []
+    X_names = []
     y = []
+    class_counter = {c.name:0 for c in classes}
 
-    ######### PAIR FILENAME WITH CLASS #########
-    for x_file in filenames:
-        for row in df.itertuples():
-            if row[3] in x_file:
-                # no finding is labeled 0
-                if np.sum(row[6:]) == 0:
-                    X.append(x_file)
-                    y.append(0)
-                    neg_count += 1
-                # extraaxial hematoma is labeled 1
-                elif row[6] == 1:
-                    X.append(x_file)
-                    y.append(1)
-                    pos_count += 1
+    for classdir in classes:
+        for filename in classdir.iterdir():
+            X_names.append(filename)
+            cur_class = filename.parts[-2]
+            y.append(class_mapping[cur_class])
+            class_counter[cur_class] += 1
 
-    X = np.array(X)
+    print("Initial class distribution:")
+    for c, count in class_counter.items():
+        print("{}: {}".format(c, count))
+
+    X_names = np.array(X_names)
     y = np.array(y)
 
-    pos_idx = np.where(y == 1)[0]
-    neg_idx = np.where(y == 0)[0]
-
-    pos_idx = shuffle(pos_idx, random_state=4)
-    neg_idx = shuffle(neg_idx, random_state=4)
+    class_indices = [np.where(y==i)[0] for i in range(len(classes))]
+    class_indices = [shuffle(c, random_state=4) for c in class_indices]
 
     ######### TRAIN/TEST SPLIT #########
-    LIMIT_TRAIN_SPLIT = int(0.8 * min(len(pos_idx), len(neg_idx)))
-    print("Num train pos: {} train neg: {}\ntest pos: {} test neg: {}".format(
-        len(pos_idx[:LIMIT_TRAIN_SPLIT]),
-        len(neg_idx[:LIMIT_TRAIN_SPLIT]),
-        len(pos_idx[LIMIT_TRAIN_SPLIT:]),
-        len(neg_idx[LIMIT_TRAIN_SPLIT:]),
-    ))
+    LIMIT_TRAIN_SPLIT = int(0.8 * min([len(i) for i in class_indices]))
+    print("\nTraining distribution:")
+    for i, n in enumerate(class_indices):
+        print("Number of train samples for class {}: {}".format(
+                class_mapping_inv[i],
+                len(n[:LIMIT_TRAIN_SPLIT])
+            )
+        )
+    print("\nTesting distribution:")
+    for i, n in enumerate(class_indices):
+        print("Number of test samples for class {}: {}".format(
+                class_mapping_inv[i],
+                len(n[LIMIT_TRAIN_SPLIT:])
+            )
+        )
 
     train_idx = np.concatenate([
-        pos_idx[:LIMIT_TRAIN_SPLIT],
-        neg_idx[:LIMIT_TRAIN_SPLIT],
+        c[:LIMIT_TRAIN_SPLIT] for c in class_indices
     ])
 
     test_idx = np.concatenate([
-        pos_idx[LIMIT_TRAIN_SPLIT:],
-        neg_idx[LIMIT_TRAIN_SPLIT:],
+        c[LIMIT_TRAIN_SPLIT:] for c in class_indices
     ])
 
-    # shuffle for randomness
+    # shuffle indices for randomness
     train_idx = shuffle(train_idx, random_state=4)
     test_idx = shuffle(test_idx, random_state=4)
 
-    X_test = X[test_idx]
+    # split
+    X_names_train = X_names[train_idx]
+    y_train = y[train_idx]
+
+    X_names_test = X_names[test_idx]
     y_test = y[test_idx]
-
-    # exclude test indices from full dataset
-    X = X[train_idx]
-    y = y[train_idx]
-
 
     ######### 5-FOLD TRAIN/VAL SPLIT #########
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=4)
 
-    for i, (train_idx, val_idx) in enumerate(skf.split(X, y)):
-        # Train TFRecord
-        with tf.python_io.TFRecordWriter(TF_RECORD_FILENAME.format(i, "train")) as writer:
-            train_pos = 0
-            train_neg = 0
-            for train_i in tqdm(train_idx):
-                x = nib.load(
-                        os.path.join(DATA_DIR, X[train_i])
-                    ).get_fdata()
-                x[np.where(x <= 0)] = 0
 
-                x_patches = get_nonoverlapping_patches(x, PATCH_DIMS)
-                x_patches = x_patches.astype(np.float16)
+    # K Fold for train and val
+    for cur_fold, (train_idx, val_idx) in enumerate(skf.split(X_names_train, y_train)):
 
-                if y[train_i] == 0:
-                    y_label = np.array([1, 0], dtype=np.int8)
-                    train_neg += 1
-                else:
-                    y_label = np.array([0, 1], dtype=np.int8)
-                    train_pos += 1
+        print("Number training samples: {}\nNumber val samples: {}".format(
+            len(train_idx),
+            len(val_idx),
+        ))
 
-                tf_example = image_example(x_patches, y_label, len(x_patches))
-                writer.write(tf_example.SerializeToString())
-        print("Train pos: {} Train neg: {}".format(train_pos, train_neg))
+        dev_info = [
+            (train_idx, "train", train_filenames_file),
+            (val_idx, "val", val_filenames_file),
+        ]
 
-        # Val TFRecord
-        with tf.python_io.TFRecordWriter(TF_RECORD_FILENAME.format(i, "val")) as writer:
-            val_pos = 0
-            val_neg = 0
-            for val_i in tqdm(val_idx):
-                x = nib.load(
-                        os.path.join(DATA_DIR, X[val_i])
-                    ).get_fdata()
-                x[np.where(x <= 0)] = 0
+        for dev_idx, cur_name, fnames_file in dev_info:
+            print("\nCreating {} TFRecord...".format(cur_name))
+            cur_tfrecord = str(TF_RECORD_FILENAME).format(cur_fold, cur_name)
+            count = 0
+            with tf.io.TFRecordWriter(cur_tfrecord) as writer:
+                for i in tqdm(dev_indices):
+                    with open(filenames_file, 'a') as f:
+                        f.write("{},{}\n".format(
+                            X_names_train[i],
+                            y_train[i],
+                        ))
 
-                x_patches = get_nonoverlapping_patches(x, PATCH_DIMS)
-                x_patches = x_patches.astype(np.float16)
+                    cur_x_slices, cur_y_label = prepare_data(
+                        X_names_train[i],
+                        y_train[i],
+                        len(classes),
+                    )
 
-                if y[val_i] == 0:
-                    y_label = np.array([1, 0], dtype=np.int8)
-                    val_neg += 1
-                else:
-                    y_label = np.array([0, 1], dtype=np.int8)
-                    val_pos += 1
+                    tf_example = volume_image_example(
+                        cur_x_slices,
+                        cur_y_label,
+                        len(cur_x_slices),
+                    )
 
-                tf_example = image_example(x_patches, y_label, len(x_patches))
-                writer.write(tf_example.SerializeToString())
-        print("Val pos: {} Val neg: {}".format(val_pos, val_neg))
+                    count += 1
+                    writer.write(tf_example.SerializeToString())
 
-    # Test TFRecord
-    with tf.python_io.TFRecordWriter(TF_RECORD_FILENAME.format("_", "test")) as writer:
-        test_pos = 0
-        test_neg = 0
-        for x_test_name, y_test_label in tqdm(zip(X_test, y_test), total=len(X_test)):
-            x = nib.load(
-                    os.path.join(DATA_DIR, x_test_name)
-                ).get_fdata()
-            x[np.where(x <= 0)] = 0
+            with open(count_file, 'a') as f:
+                f.write("{} {} {}\n".format(cur_name, cur_fold, count))
 
-            x_patches = get_nonoverlapping_patches(x, PATCH_DIMS)
-            x_patches = x_patches.astype(np.float16)
 
-            if y_test_label == 0:
-                y_label = np.array([1, 0], dtype=np.int8)
-                test_neg += 1
-            else:
-                y_label = np.array([0, 1], dtype=np.int8)
-                test_pos += 1
+    print("\nCreating Test TFRecord...")
+    count = 0
+    with tf.io.TFRecordWriter(str(TF_RECORD_FILENAME).format("_", "test")) as writer:
+        for x_name, y_label in tqdm(zip(X_names_test, y_test), total=len(X_names_test)):
+            with open(TEST_FILENAMES_FILE, 'a') as f:
+                f.write("{},{}\n".format(x_name, y_label))
+            x_slices, y_label = prepare_data(
+                x_name,
+                y_label,
+                len(classes),
+            )
 
-            tf_example = image_example(x_patches, y_label, len(x_patches))
+            count += 1
+            tf_example = volume_image_example(x_slices, y_label, len(x_slices))
             writer.write(tf_example.SerializeToString())
-    print("Test pos: {} Test neg: {}".format(test_pos, test_neg))
-
+            
+    with open(count_file, 'a') as f:
+        f.write("{} {} {}\n".format("test", "_", count))
