@@ -1,5 +1,6 @@
 # Multiple Instance Learning
 Deep learning for binary classification using multiple instance learning (MIL).
+
 Notes:
 - Binary classifier: positive vs negative.
 - For MIL, bags contain instances.  Bags have a ground truth, either positive or negative.
