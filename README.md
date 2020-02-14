@@ -28,13 +28,14 @@ considered positive.
 ```
 
 2. Run `python make_tfrecord.py {DATA_DIR} TARGETDIR` and supply the correct arguments.
-3. Run `python train.py` and wait for convergence.
-4. Run `python eval.py INPUT_SAMPLE` to evaluate on a sample. TODO
-
+3. Run `python train.py` 
 
 
 ## References
-The associated paper is available on ResearchGate: LINK TODO
-
 If this code is useful for your project, please cite our work:
-CITE TODO
+
+https://arxiv.org/abs/1911.05650
+
+`
+Remedios, Samuel W., Zihao Wu, Camilo Bermudez, Cailey I. Kerley, Snehashis Roy, Mayur B. Patel, John A. Butman, Bennett A. Landman, and Dzung L. Pham. "Extracting 2D weak labels from volume labels using multiple instance learning in CT hemorrhage detection." arXiv preprint arXiv:1911.05650 (2019).
+`

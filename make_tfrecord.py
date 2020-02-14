@@ -33,6 +33,17 @@ def prepare_data(x_filename, y_label, num_classes):
     return x_slices, y
 
 if __name__ == "__main__":
+
+    print(
+            ("\n\n***WARNING***\n")
+            ("Please remove these lines from the source code before running.\n")
+            ("Please also change all filenames provided to suit your directory ")
+            ("structure and all hyperparameters for your specific problem.\n")
+            ("Thank you.\n\n")
+        )
+    sys.exit()
+
+
     if len(sys.argv) < 3:
         print(
                 ("Missing cmd line arguments.\n")

@@ -12,7 +12,6 @@ from utils.augmentations import *
 from utils.tfrecord_utils import *
 from utils.pad import *
 from models.resnet import *
-from models.phinet import *
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -72,6 +71,16 @@ def step_bag_val(inputs, model):
 
 
 if __name__ == "__main__":
+
+    print(
+            ("\n\n***WARNING***\n")
+            ("Please remove these lines from the source code before running.\n")
+            ("Please also change all filenames provided to suit your directory ")
+            ("structure and all hyperparameters for your specific problem.\n")
+            ("Thank you.\n\n")
+        )
+    sys.exit()
+
 
     if len(sys.argv) < 2:
         print(
