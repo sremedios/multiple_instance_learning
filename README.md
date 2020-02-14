@@ -36,6 +36,6 @@ If this code is useful for your project, please cite our work:
 
 https://arxiv.org/abs/1911.05650
 
-`
+```
 Remedios, Samuel W., Zihao Wu, Camilo Bermudez, Cailey I. Kerley, Snehashis Roy, Mayur B. Patel, John A. Butman, Bennett A. Landman, and Dzung L. Pham. "Extracting 2D weak labels from volume labels using multiple instance learning in CT hemorrhage detection." arXiv preprint arXiv:1911.05650 (2019).
-`
+```
